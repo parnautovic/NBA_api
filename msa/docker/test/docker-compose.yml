@@ -1,0 +1,38 @@
+version: "3.8"
+
+services:
+
+#
+# Backing services
+#
+
+#
+# Postgres
+#
+  pg-game:
+    image: "postgres"
+    environment:
+      - POSTGRES_USER=game
+      - POSTGRES_PASSWORD=game!
+      - POSTGRES_DB=game-test
+    ports:
+      - "6432:5432"
+    volumes:
+      - pg-test-vol:/var/lib/postgresql/data
+
+#
+# RabbitMQ
+#
+  rabbitmq:
+    image: rabbitmq:3-management
+    hostname: rabbitmq
+    volumes:
+      - ./rabbitmq/data:/var/lib/rabbitmq/mnesia/rabbit@rabbitmq
+      - ./rabbitmq/log:/var/log/rabbitmq/log
+    ports:
+      - 5672:5672
+      - 15672:15672
+
+volumes: 
+  pg-test-vol:
+    external: true

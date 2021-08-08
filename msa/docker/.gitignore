@@ -1,0 +1,3 @@
+*.project
+/rabbitmq/
+/elk-data/

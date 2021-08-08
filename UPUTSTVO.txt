@@ -1,0 +1,40 @@
+Korak 0:
+Kreirati volumen pg-game-vol // docker volume create pg-game-vol
+
+Build servise, mvnw.cmd clean install
+za game-service,potrebno  docker-compose up iz foldera docker/test kreirati volume pg-test-vol
+1:
+(rabbitmq, pg-game, elk)
+docker-compose up -d rabbitmq pg-game elk
+
+2:
+discovery-service
+ docker-compose up -d discovery-service
+
+3:
+config-service
+docker-compose up -d config-service
+
+
+provera za rabbitmq: http://localhost:55673
+provera za elk: http://localhost:5601
+
+5:
+pbp-service
+docker-compose up -d pbp-service
+
+6: 
+stats-service
+docker-compose up -d stats-service
+
+7:
+game-service
+
+docker-compose up -d game-service
+
+Restartovanje pojedinacnog servisa:
+docker-compose restart docker_{naziv_servisa}_1 gde se {...} zameni sa nazivom servisa
+docker-compose restart docker_pbp-service_1
+
+Stopiranje svih servisa: docker-compose down
+

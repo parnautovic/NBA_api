@@ -1,0 +1,143 @@
+version: "3.8"
+
+services:
+
+#
+# Backing services
+#
+
+#
+# Postgres
+#
+  pg-game:
+    image: "postgres"
+    environment:
+      - POSTGRES_USER=game
+      - POSTGRES_PASSWORD=game!
+      - POSTGRES_DB=game
+    ports:
+      - "55432:5432"
+    volumes:
+      - pg-game-vol:/var/lib/postgresql/data
+#
+# Jenkins
+#
+  jenkins:
+    build: jenkins/
+    image: 'jenkins/jenkins:lts-alpine'
+    restart: unless-stopped
+    environment:
+      TZ: Europe/Belgrade
+    ports:
+      - '58080:8080'
+    volumes:
+      - 'jenkins_home:/var/jenkins_home'
+#
+# RabbitMQ
+#
+  rabbitmq:
+    image: rabbitmq:3-management
+    hostname: rabbitmq
+    volumes:
+      - ./rabbitmq/data:/var/lib/rabbitmq/mnesia/rabbit@rabbitmq
+      - ./rabbitmq/log:/var/log/rabbitmq/log
+    ports:
+      - 55672:5672
+      - 55673:15672
+
+#
+# ELK
+#
+  elk:
+    image: sebp/elk
+    ports:
+      - "5601:5601"
+      - "9200:9200"
+      # Not using Filebeat
+      # - "5044:5044" 
+      # Using TCP instead
+      - "5000:5000"
+    volumes:
+    # Our custom configuration, maps to sebp/elk layout
+      - './elk/logstash-input.conf:/etc/logstash/conf.d/03-input.conf'
+      - './elk/logstash-filter.conf:/etc/logstash/conf.d/11-syslog.conf'
+      - './elk/logstash-output.conf:/etc/logstash/conf.d/30-output.conf'
+    # Persistable logs
+      - './elk-data:/var/lib/elasticsearch'
+    healthcheck:
+      test: ["CMD-SHELL", "curl --silent --fail localhost:9200/_cluster/health || exit 1"]
+      interval: 20s
+      timeout: 10s
+      retries: 3
+
+#
+# Cloud services
+#
+
+  discovery-service:
+    image: discovery-service:latest
+    ports:
+      - 8761:8761
+    environment:
+      - TZ=Europe/Belgrade
+
+  config-service:
+    image: config-service:latest
+    ports:
+      - 8888:8888
+    environment:
+    - TZ=Europe/Belgrade
+    - EUREKA_HOST=discovery-service
+    volumes:
+    - '../../msa-config:/var/git/msa-config'
+    depends_on:
+    - discovery-service
+
+#
+# Application services
+#
+
+  pbp-service:
+    image: pbp-service:latest
+    ports:
+      - 8080:8080
+    environment:
+      - TZ=Europe/Belgrade
+      - SPRING_PROFILES_ACTIVE=development
+      - EUREKA_HOST=discovery-service
+    depends_on:
+      - elk
+      - config-service
+
+  game-service:
+    image: game-service:latest
+    ports:
+      - 8081:8081
+    environment:
+      - TZ=Europe/Belgrade
+      - SPRING_PROFILES_ACTIVE=development
+      - EUREKA_HOST=discovery-service
+    depends_on:
+      - pg-game
+      - elk
+      - config-service
+      - pbp-service
+
+  stats-service:
+    image: stats-service:latest
+    ports:
+      - 8082:8082
+    environment:
+      - TZ=Europe/Belgrade
+      - SPRING_PROFILES_ACTIVE=development
+      - EUREKA_HOST=discovery-service
+    depends_on:
+      - config-service
+      - elk
+      - rabbitmq
+
+# docker volume create pg-game-vol
+volumes:
+  pg-game-vol:
+    external: true
+  jenkins_home:
